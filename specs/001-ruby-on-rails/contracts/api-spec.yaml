@@ -1,0 +1,511 @@
+openapi: 3.0.0
+info:
+  title: ECサイト API
+  version: 0.1.0
+  description: 架空のECサイトプラットフォーム REST API
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+paths:
+  # Products API
+  /products:
+    get:
+      summary: 商品一覧取得
+      parameters:
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 商品一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /products/{id}:
+    get:
+      summary: 商品詳細取得
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 商品詳細
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProductDetail'
+        '404':
+          description: 商品が見つからない
+
+  # Categories API
+  /categories:
+    get:
+      summary: カテゴリ一覧取得
+      responses:
+        '200':
+          description: カテゴリ一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+
+  # Cart API
+  /cart:
+    get:
+      summary: カート内容取得
+      security:
+        - SessionAuth: []
+        - {}
+      responses:
+        '200':
+          description: カート内容
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Cart'
+
+  /cart/items:
+    post:
+      summary: カートに商品追加
+      security:
+        - SessionAuth: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id:
+                  type: integer
+                quantity:
+                  type: integer
+                  minimum: 1
+              required:
+                - product_id
+                - quantity
+      responses:
+        '201':
+          description: カート追加成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CartItem'
+        '400':
+          description: 不正なリクエスト
+        '422':
+          description: 在庫不足
+
+  /cart/items/{id}:
+    patch:
+      summary: カートアイテム数量更新
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: session_id
+          in: header
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+        - SessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+              required:
+                - quantity
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CartItem'
+
+    delete:
+      summary: カートアイテム削除
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: session_id
+          in: header
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+        - SessionAuth: []
+      responses:
+        '204':
+          description: 削除成功
+
+  # User Authentication
+  /auth/signup:
+    post:
+      summary: ユーザー登録
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
+                      format: email
+                    password:
+                      type: string
+                      minLength: 8
+                  required:
+                    - name
+                    - email
+                    - password
+                session_id:
+                  type: string
+                  description: ゲストカート引き継ぎ用
+      responses:
+        '201':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+
+  /auth/signin:
+    post:
+      summary: ユーザーログイン
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: ログイン成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+
+  # Reviews API
+  /products/{product_id}/reviews:
+    get:
+      summary: 商品レビュー一覧
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: レビュー一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Review'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+    post:
+      summary: レビュー投稿
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                comment:
+                  type: string
+                  maxLength: 500
+              required:
+                - rating
+      responses:
+        '201':
+          description: レビュー投稿成功
+        '401':
+          description: 未認証
+        '422':
+          description: バリデーションエラー
+
+  # Wishlist API
+  /wishlist:
+    get:
+      summary: ウィッシュリスト取得
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: ウィッシュリスト
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Wishlist'
+
+  /wishlist/items:
+    post:
+      summary: ウィッシュリストに商品追加
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id:
+                  type: integer
+              required:
+                - product_id
+      responses:
+        '201':
+          description: 追加成功
+
+  /wishlist/items/{product_id}:
+    delete:
+      summary: ウィッシュリストから削除
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: 削除成功
+
+components:
+  securitySchemes:
+    SessionAuth:
+      type: apiKey
+      in: cookie
+      name: _ecommerce_session
+      description: Rails session cookie for authentication
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        price:
+          type: number
+          format: decimal
+        image_url:
+          type: string
+        category:
+          $ref: '#/components/schemas/Category'
+        average_rating:
+          type: number
+          format: float
+        review_count:
+          type: integer
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            description:
+              type: string
+            inventory:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+            reviews:
+              type: array
+              items:
+                $ref: '#/components/schemas/Review'
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        total_amount:
+          type: number
+          format: decimal
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product:
+          $ref: '#/components/schemas/Product'
+        quantity:
+          type: integer
+        subtotal:
+          type: number
+          format: decimal
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_name:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+
+    Wishlist:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        total_pages:
+          type: integer
+        total_count:
+          type: integer
+        per_page:
+          type: integer
